@@ -8,6 +8,7 @@
 #include<iphlpapi.h>
 #include<iostream>
 #include<string>
+#include<thread>
 using namespace std;
 
 #pragma comment(lib, "WS2_32.lib")
@@ -99,6 +100,8 @@ int main()
 	//	else cout << "Receive failed with error: " << WSAGetLastError() << endl;
 	//} while (iResult > 0);
 	
+	thread waiting_server_thread(WaitingServer, connect_socket);
+
 	string str;
 	while (true)
 	{
@@ -114,14 +117,9 @@ int main()
 			closesocket(connect_socket);
 			freeaddrinfo(result);
 			WSACleanup();
+			if (waiting_server_thread.joinable()) waiting_server_thread.join();
 			return dwLastError;
 		}
-
-		CHAR recv_buffer[BUFFER_LENGHT] = {};
-		iResult = recv(connect_socket, recv_buffer, BUFFER_LENGHT, 0);
-		if (iResult > 0) cout << iResult << " Bytes received, message:\t" << recv_buffer << ".\n";
-		else if (iResult == 0) cout << "Connection closed" << endl;
-		else cout << "Received failed with error: " << WSAGetLastError() << endl;
 	}
 
 	//7)Отключение от Сервера:
@@ -134,5 +132,19 @@ int main()
 	closesocket(connect_socket);
 	freeaddrinfo(result);
 	WSACleanup();
+	if (waiting_server_thread.joinable()) waiting_server_thread.join();
 	return dwLastError;
+}
+
+void WaitingServer(SOCKET connect_socket)
+{
+	INT iResult = 0;
+	do
+	{
+		CHAR recv_buffer[BUFFER_LENGHT] = {};
+		iResult = recv(connect_socket, recv_buffer, BUFFER_LENGHT, 0);
+		if (iResult > 0) cout << iResult << " Bytes received, message:\t" << recv_buffer << ".\n";
+		else if (iResult == 0) cout << "Connection closed" << endl;
+		else cout << "Received failed with error: " << WSAGetLastError() << endl;
+	} while (iResult > 0);
 }
