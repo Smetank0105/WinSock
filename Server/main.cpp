@@ -13,6 +13,9 @@ using namespace std;
 
 #define DEFAULT_PORT	"27015"
 #define BUFFER_LENGHT	1460
+#define MAX_CLIENTS		5
+
+DWORD WINAPI HandleClient(LPVOID lp_client_socket);
 
 int main()
 {
@@ -87,30 +90,49 @@ int main()
 	}
 
 	//6)Обработка запросов от клиентов:
+	INT n = 0;	//Кол-во активных клиентов
+	SOCKET client_sockets[MAX_CLIENTS] = {};
+	HANDLE hThreads[MAX_CLIENTS] = {};
 	cout << "Accept client connections..." << endl;
-	SOCKET client_socket = accept(listen_socket, NULL, NULL);
-	if (client_socket == INVALID_SOCKET)
+	do
 	{
-		dwLastError = WSAGetLastError();
-		cout << "Accept failed with error: " << dwLastError << endl;
-		closesocket(listen_socket);
-		freeaddrinfo(result);
-		WSACleanup();
-		return dwLastError;
-	}
+		client_sockets[n] = accept(listen_socket, NULL, NULL);
+		if (client_sockets[n] == INVALID_SOCKET)
+		{
+			dwLastError = WSAGetLastError();
+			cout << "Accept failed with error: " << dwLastError << endl;
+			closesocket(listen_socket);
+			freeaddrinfo(result);
+			WSACleanup();
+			return dwLastError;
+		}
+		hThreads[n] = CreateThread(NULL, 0, HandleClient, &client_sockets[n], 0, NULL);
+		n++;
+	} while (true);
 
-	//7)Получение запросов от клиента:
+	//7)Ожидание запроса клиента:
+	//HandleClient(client_socket);
 
+	closesocket(listen_socket);
+	freeaddrinfo(result);
+	WSACleanup();
+	return dwLastError;
+}
+DWORD WINAPI HandleClient(LPVOID lp_client_socket)
+{
+	SOCKET* client_socket = (SOCKET*)lp_client_socket;
+	INT iResult = 0;
+	DWORD dwLastError = 0;
 	do
 	{
 		CHAR recv_buffer[BUFFER_LENGHT] = {};
 		CHAR send_buffer[BUFFER_LENGHT] = "Привет клиент";
 		INT iSendResult = 0;
-		iResult = recv(client_socket, recv_buffer, BUFFER_LENGHT, 0);
+		iResult = recv(*client_socket, recv_buffer, BUFFER_LENGHT, 0);
 		if (iResult > 0)
 		{
-			cout << iResult << " Bytes received, Message: " << recv_buffer << endl;
-			iSendResult = send(client_socket, recv_buffer, strlen(recv_buffer), 0);
+			cout << iResult << " Bytes received, Message from " << *client_socket << ": " << recv_buffer << endl;
+			iSendResult = send(*client_socket, recv_buffer, strlen(recv_buffer), 0);
 			if (iSendResult == SOCKET_ERROR)
 			{
 				dwLastError = WSAGetLastError();
@@ -127,9 +149,6 @@ int main()
 			break;
 		}
 	} while (iResult > 0);
-	closesocket(client_socket);
-	closesocket(listen_socket);
-	freeaddrinfo(result);
-	WSACleanup();
+	closesocket(*client_socket);
 	return dwLastError;
 }
