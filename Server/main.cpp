@@ -123,6 +123,11 @@ DWORD WINAPI HandleClient(LPVOID lp_client_socket)
 	SOCKET* client_socket = (SOCKET*)lp_client_socket;
 	INT iResult = 0;
 	DWORD dwLastError = 0;
+	struct sockaddr_in client_id;
+	int client_id_len = sizeof(client_id);
+	CHAR client_IP[INET_ADDRSTRLEN] = {};
+	getpeername(*client_socket,(SOCKADDR*)&client_id, &client_id_len);
+	inet_ntop(AF_INET, &client_id.sin_addr, client_IP, sizeof(client_IP));
 	do
 	{
 		CHAR recv_buffer[BUFFER_LENGHT] = {};
@@ -131,7 +136,7 @@ DWORD WINAPI HandleClient(LPVOID lp_client_socket)
 		iResult = recv(*client_socket, recv_buffer, BUFFER_LENGHT, 0);
 		if (iResult > 0)
 		{
-			cout << iResult << " Bytes received, Message from " << *client_socket << ": " << recv_buffer << endl;
+			cout << iResult << " Bytes received, Message from <" << client_IP << ":" << ntohs(client_id.sin_port) << ">: " << recv_buffer << endl;
 			iSendResult = send(*client_socket, recv_buffer, strlen(recv_buffer), 0);
 			if (iSendResult == SOCKET_ERROR)
 			{
