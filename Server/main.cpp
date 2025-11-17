@@ -13,9 +13,15 @@ using namespace std;
 
 #define DEFAULT_PORT	"27015"
 #define BUFFER_LENGHT	1460
-#define MAX_CLIENTS		5
+#define MAX_CLIENTS		3
+#define g_sz_SORRY		"Error: Количество подключений превышено."
 
-DWORD WINAPI HandleClient(LPVOID lp_client_socket);
+INT n = 0;	//Кол-во активных клиентов
+SOCKET client_sockets[MAX_CLIENTS] = {};
+HANDLE hThreads[MAX_CLIENTS] = {};
+DWORD threadIDs[MAX_CLIENTS] = {};
+
+VOID WINAPI HandleClient(SOCKET client_socket);
 
 int main()
 {
@@ -90,24 +96,41 @@ int main()
 	}
 
 	//6)Обработка запросов от клиентов:
-	INT n = 0;	//Кол-во активных клиентов
-	SOCKET client_sockets[MAX_CLIENTS] = {};
-	HANDLE hThreads[MAX_CLIENTS] = {};
+	//INT n = 0;	//Кол-во активных клиентов
+	//SOCKET client_sockets[MAX_CLIENTS] = {};
+	//HANDLE hThreads[MAX_CLIENTS] = {};
+	//DWORD threads[MAX_CLIENTS] = {};
 	cout << "Accept client connections..." << endl;
 	do
 	{
-		client_sockets[n] = accept(listen_socket, NULL, NULL);
-		if (client_sockets[n] == INVALID_SOCKET)
+		SOCKET client_socket = accept(listen_socket, NULL, NULL);
+		//if (client_sockets[n] == INVALID_SOCKET)
+		//{
+		//	dwLastError = WSAGetLastError();
+		//	cout << "Accept failed with error: " << dwLastError << endl;
+		//	closesocket(listen_socket);
+		//	freeaddrinfo(result);
+		//	WSACleanup();
+		//	return dwLastError;
+		//}
+		if (n < MAX_CLIENTS)
 		{
-			dwLastError = WSAGetLastError();
-			cout << "Accept failed with error: " << dwLastError << endl;
-			closesocket(listen_socket);
-			freeaddrinfo(result);
-			WSACleanup();
-			return dwLastError;
+			client_sockets[n] = client_socket;
+			hThreads[n] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)HandleClient, (LPVOID)client_sockets[n], 0, threadIDs + n);
+			n++;
 		}
-		hThreads[n] = CreateThread(NULL, 0, HandleClient, &client_sockets[n], 0, NULL);
-		n++;
+		else
+		{
+			CHAR recv_buffer[BUFFER_LENGHT] = {};
+			INT iResult = recv(client_socket, recv_buffer, BUFFER_LENGHT, 0);
+			if (iResult > 0)
+			{
+				cout << "Bytes received: " << iResult << endl;
+				cout << "Message: " << recv_buffer << endl;
+				INT iSendResult = send(client_socket, g_sz_SORRY, strlen(g_sz_SORRY), 0);
+				closesocket(client_socket);
+			}
+		}
 	} while (true);
 
 	//7)Ожидание запроса клиента:
@@ -118,9 +141,9 @@ int main()
 	WSACleanup();
 	return dwLastError;
 }
-DWORD WINAPI HandleClient(LPVOID lp_client_socket)
+
+VOID WINAPI HandleClient(SOCKET client_socket)
 {
-	SOCKET* client_socket = (SOCKET*)lp_client_socket;
 	INT iResult = 0;
 	DWORD dwLastError = 0;
 	do
@@ -128,11 +151,11 @@ DWORD WINAPI HandleClient(LPVOID lp_client_socket)
 		CHAR recv_buffer[BUFFER_LENGHT] = {};
 		CHAR send_buffer[BUFFER_LENGHT] = "Привет клиент";
 		INT iSendResult = 0;
-		iResult = recv(*client_socket, recv_buffer, BUFFER_LENGHT, 0);
+		iResult = recv(client_socket, recv_buffer, BUFFER_LENGHT, 0);
 		if (iResult > 0)
 		{
-			cout << iResult << " Bytes received, Message from " << *client_socket << ": " << recv_buffer << endl;
-			iSendResult = send(*client_socket, recv_buffer, strlen(recv_buffer), 0);
+			cout << iResult << " Bytes received, Message from " << client_socket << ": " << recv_buffer << endl;
+			iSendResult = send(client_socket, recv_buffer, strlen(recv_buffer), 0);
 			if (iSendResult == SOCKET_ERROR)
 			{
 				dwLastError = WSAGetLastError();
@@ -149,6 +172,5 @@ DWORD WINAPI HandleClient(LPVOID lp_client_socket)
 			break;
 		}
 	} while (iResult > 0);
-	closesocket(*client_socket);
-	return dwLastError;
+	closesocket(client_socket);
 }
