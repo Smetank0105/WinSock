@@ -107,6 +107,7 @@ int main()
 	//} while (strcmp(send_buffer, "exit") && strcmp(send_buffer, "quit"));
 
 	//7)Отключение от Сервера:
+	send(connect_socket, "quit", 4, 0);
 	iResult = shutdown(connect_socket, SD_SEND);
 	if (iResult == SOCKET_ERROR)
 	{

@@ -11,10 +11,11 @@ using namespace std;
 
 #pragma comment(lib, "WS2_32.lib")
 
-#define DEFAULT_PORT	"27015"
-#define BUFFER_LENGHT	1460
-#define MAX_CLIENTS		3
-#define g_sz_SORRY		"Error: Количество подключений превышено."
+#define DEFAULT_PORT		"27015"
+#define BUFFER_LENGHT		1460
+#define MAX_CLIENTS			3
+#define g_sz_SORRY			"Error: Количество подключений превышено."
+#define IP_STR_MAX_LENGTH	16
 
 INT n = 0;	//Кол-во активных клиентов
 SOCKET client_sockets[MAX_CLIENTS] = {};
@@ -133,8 +134,7 @@ int main()
 		}
 	} while (true);
 
-	//7)Ожидание запроса клиента:
-	//HandleClient(client_socket);
+	WaitForMultipleObjects(MAX_CLIENTS, hThreads, TRUE, INFINITE);
 
 	closesocket(listen_socket);
 	freeaddrinfo(result);
@@ -142,19 +142,52 @@ int main()
 	return dwLastError;
 }
 
+INT GetSlotIndex(DWORD dwID)
+{
+	for (int i = 0; i < MAX_CLIENTS; i++)
+	{
+		if (threadIDs[i] == dwID) return i;
+	}
+}
+
+VOID Shift(INT start)
+{
+	for (INT i = start; i < MAX_CLIENTS; i++)
+	{
+		client_sockets[i] = client_sockets[i + 1];
+		threadIDs[i] = threadIDs[i + 1];
+		hThreads[i] = hThreads[i + 1];
+	}
+	client_sockets[MAX_CLIENTS - 1] = NULL;
+	threadIDs[MAX_CLIENTS - 1] = NULL;
+	hThreads[MAX_CLIENTS - 1] = NULL;
+	n--;
+}
+
 VOID WINAPI HandleClient(SOCKET client_socket)
 {
+	sockaddr_in peer{};
+	CHAR address[IP_STR_MAX_LENGTH] = {};
+	INT address_length = IP_STR_MAX_LENGTH;
+	getpeername(client_socket, (SOCKADDR*)&peer, &address_length);
+	inet_ntop(AF_INET, &peer.sin_addr, address, address_length);
+	//int port = ntohs(peer.sin_port);
+	int port = ((peer.sin_port & 0xFF) << 8) + (peer.sin_port >> 8);
+	//cout << address << ":" << port << endl;
+
 	INT iResult = 0;
 	DWORD dwLastError = 0;
+	CHAR recv_buffer[BUFFER_LENGHT] = {};
+	CHAR send_buffer[BUFFER_LENGHT] = "Привет клиент";
 	do
 	{
-		CHAR recv_buffer[BUFFER_LENGHT] = {};
-		CHAR send_buffer[BUFFER_LENGHT] = "Привет клиент";
 		INT iSendResult = 0;
+		ZeroMemory(send_buffer, BUFFER_LENGHT);
+		ZeroMemory(recv_buffer, BUFFER_LENGHT);
 		iResult = recv(client_socket, recv_buffer, BUFFER_LENGHT, 0);
 		if (iResult > 0)
 		{
-			cout << iResult << " Bytes received, Message from " << client_socket << ": " << recv_buffer << endl;
+			cout << iResult << " Bytes received, Message from " << address << ":"<< port << "-" << ": " << recv_buffer << endl;
 			iSendResult = send(client_socket, recv_buffer, strlen(recv_buffer), 0);
 			if (iSendResult == SOCKET_ERROR)
 			{
@@ -171,6 +204,10 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 			cout << "Send failed with error: " << dwLastError << endl;
 			break;
 		}
-	} while (iResult > 0);
+	} while (iResult > 0 && !strstr(recv_buffer, "quit"));
+	DWORD dwID = GetCurrentThreadId();
+	Shift(GetSlotIndex(dwID));
+	cout << address << ":" << port << " leaved" << endl;
+	ExitThread(0);
 	closesocket(client_socket);
 }
