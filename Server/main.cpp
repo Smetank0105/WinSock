@@ -132,6 +132,7 @@ int main()
 				closesocket(client_socket);
 			}
 		}
+		cout << "Количество активных клиентов: " << n << "; Количество свободных слотов: " << MAX_CLIENTS - n << endl;
 	} while (true);
 
 	WaitForMultipleObjects(MAX_CLIENTS, hThreads, TRUE, INFINITE);
@@ -174,11 +175,13 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 	//int port = ntohs(peer.sin_port);
 	int port = ((peer.sin_port & 0xFF) << 8) + (peer.sin_port >> 8);
 	//cout << address << ":" << port << endl;
+	
+	DWORD dwID = GetCurrentThreadId();
 
 	INT iResult = 0;
 	DWORD dwLastError = 0;
 	CHAR recv_buffer[BUFFER_LENGHT] = {};
-	CHAR send_buffer[BUFFER_LENGHT] = "Привет клиент";
+	CHAR send_buffer[BUFFER_LENGHT] = {};
 	do
 	{
 		INT iSendResult = 0;
@@ -188,14 +191,19 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 		if (iResult > 0)
 		{
 			cout << iResult << " Bytes received, Message from " << address << ":"<< port << "-" << ": " << recv_buffer << endl;
-			iSendResult = send(client_socket, recv_buffer, strlen(recv_buffer), 0);
-			if (iSendResult == SOCKET_ERROR)
+			snprintf(send_buffer, sizeof(send_buffer), "<%s:%id>: %s", address, port, recv_buffer);
+			for (INT i = 0; i < n; i++)
 			{
-				dwLastError = WSAGetLastError();
-				cout << "Send failed with error: " << dwLastError << endl;
-				break;
+				if (i == GetSlotIndex(dwID))continue;
+				iSendResult = send(client_sockets[i], send_buffer, strlen(send_buffer), 0);
+				if (iSendResult == SOCKET_ERROR)
+				{
+					dwLastError = WSAGetLastError();
+					cout << "Send failed with error: " << dwLastError << endl;
+					break;
+				}
+				cout << "Bytes send: " << iSendResult << endl;
 			}
-			cout << "Bytes send: " << iSendResult << endl;
 		}
 		else if (iResult == 0) cout << "Connection closing" << endl;
 		else
@@ -205,7 +213,6 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 			break;
 		}
 	} while (iResult > 0 && !strstr(recv_buffer, "quit"));
-	DWORD dwID = GetCurrentThreadId();
 	Shift(GetSlotIndex(dwID));
 	cout << address << ":" << port << " leaved" << endl;
 	ExitThread(0);

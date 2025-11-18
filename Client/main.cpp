@@ -7,12 +7,16 @@
 #include<WS2tcpip.h>
 #include<iphlpapi.h>
 #include<iostream>
+#include<thread>
+#include<atomic>
 using namespace std;
 
 #pragma comment(lib, "WS2_32.lib")
 
 #define DEFAULT_PORT "27015"
 #define BUFFER_LENGHT 1460
+
+void WaitingServer(SOCKET connect_socket);
 
 int main()
 {
@@ -73,6 +77,9 @@ int main()
 	}
 
 	//5)Отправляем данные на Срвер:
+
+	thread waiting_server_thread(WaitingServer, connect_socket);
+
 	CHAR send_buffer[BUFFER_LENGHT] = "Hello Server, I am client";
 	do
 	{
@@ -89,22 +96,18 @@ int main()
 		cout << iResult << " Bytes send" << endl;
 
 		//6)Ожидаем ответ от Сервера:
-		CHAR recv_buffer[BUFFER_LENGHT] = {};
-		//do
-		{
-			iResult = recv(connect_socket, recv_buffer, BUFFER_LENGHT, 0);
-			if (iResult > 0) cout << iResult << " Bytes received, message:\t" << recv_buffer << ".\n";
-			else if (iResult == 0) cout << "Connection closed" << endl;
-			else cout << "Receive failed with error: " << WSAGetLastError() << endl;
-		} //while (iResult > 0);
+		//CHAR recv_buffer[BUFFER_LENGHT] = {};
+		//iResult = recv(connect_socket, recv_buffer, BUFFER_LENGHT, 0);
+		//if (iResult > 0) cout << iResult << " Bytes received, message:\t" << recv_buffer << ".\n";
+		//else if (iResult == 0) cout << "Connection closed" << endl;
+		//else cout << "Receive failed with error: " << WSAGetLastError() << endl;
 
 		ZeroMemory(send_buffer, BUFFER_LENGHT);
-		cout << "Введите сообщение: ";
+		//cout << "Введите сообщение: ";
 		SetConsoleCP(1251);
 		cin.getline(send_buffer, BUFFER_LENGHT);
 		SetConsoleCP(866);
 	} while (strstr(send_buffer, "exit") == 0 && strstr(send_buffer, "quit") == 0);
-	//} while (strcmp(send_buffer, "exit") && strcmp(send_buffer, "quit"));
 
 	//7)Отключение от Сервера:
 	send(connect_socket, "quit", 4, 0);
@@ -114,8 +117,22 @@ int main()
 		dwLastError = WSAGetLastError();
 		cout << "Shutdown failed with error: " << dwLastError << endl;
 	}
+	if (waiting_server_thread.joinable()) waiting_server_thread.join();
 	closesocket(connect_socket);
 	freeaddrinfo(result);
 	WSACleanup();
 	return dwLastError;
+}
+
+void WaitingServer(SOCKET connect_socket)
+{
+	INT iResult = 0;
+	do
+	{
+		CHAR recv_buffer[BUFFER_LENGHT] = {};
+		iResult = recv(connect_socket, recv_buffer, BUFFER_LENGHT, 0);
+		if (iResult > 0) cout << iResult << " Bytes received, message:\t" << recv_buffer << ".\n";
+		else if (iResult == 0) cout << "Connection closed" << endl;
+		else cout << "Received failed with error: " << WSAGetLastError() << endl;
+	} while (iResult > 0);
 }
