@@ -185,7 +185,7 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 	inet_ntop(AF_INET, &peer.sin_addr, address, address_length);
 	//int port = ntohs(peer.sin_port);
 	int port = ((peer.sin_port & 0xFF) << 8) + (peer.sin_port >> 8);
-	//cout << address << ":" << port << endl;
+	cout << address << ":" << port << endl;
 
 	INT iResult = 0;
 	DWORD dwLastError = 0;
