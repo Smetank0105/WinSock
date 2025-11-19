@@ -215,6 +215,7 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 	} while (iResult > 0 && !strstr(recv_buffer, "quit"));
 	Shift(GetSlotIndex(dwID));
 	cout << address << ":" << port << " leaved" << endl;
+	cout << "Количество активных клиентов: " << n << "; Количество свободных слотов: " << MAX_CLIENTS - n << endl;
 	ExitThread(0);
 	closesocket(client_socket);
 }
