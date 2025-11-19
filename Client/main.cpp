@@ -117,10 +117,10 @@ int main()
 		dwLastError = WSAGetLastError();
 		cout << "Shutdown failed with error: " << dwLastError << endl;
 	}
-	if (waiting_server_thread.joinable()) waiting_server_thread.join();
 	closesocket(connect_socket);
 	freeaddrinfo(result);
 	WSACleanup();
+	if (waiting_server_thread.joinable()) waiting_server_thread.join();
 	return dwLastError;
 }
 
