@@ -1,4 +1,5 @@
-﻿#ifndef WIN32_LEAN_AND_MEAN
+﻿#define _CRT_SECURE_NO_WARNINGS
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif //!WIN32_LEAN_AND_MEAN
 
@@ -164,6 +165,17 @@ VOID Shift(INT start)
 	n--;
 }
 
+VOID Broadcast(CONST CHAR message[], SOCKET source)
+{
+	for (int i = 0; i < n; i++)
+	{
+		if (client_sockets[i] != source)
+		{
+			INT iResult = send(client_sockets[i], message, strlen(message), 0);
+		}
+	}
+}
+
 VOID WINAPI HandleClient(SOCKET client_socket)
 {
 	sockaddr_in peer{};
@@ -188,6 +200,8 @@ VOID WINAPI HandleClient(SOCKET client_socket)
 		if (iResult > 0)
 		{
 			cout << iResult << " Bytes received, Message from " << address << ":"<< port << "-" << ": " << recv_buffer << endl;
+			sprintf(send_buffer, "%i Bytes received from %s:%i - %s;\n", iResult, address, port, recv_buffer);
+			Broadcast(send_buffer, client_socket);
 			iSendResult = send(client_socket, recv_buffer, strlen(recv_buffer), 0);
 			if (iSendResult == SOCKET_ERROR)
 			{
